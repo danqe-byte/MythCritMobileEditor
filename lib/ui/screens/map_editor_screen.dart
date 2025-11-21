@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -32,6 +31,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
   Project? _project;
   MapData? _currentMap;
   bool _markerMode = false;
+  bool _tokenPlacementMode = false;
   Timer? _saveTimer;
   bool _loading = true;
 
@@ -94,6 +94,8 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     project.lastOpenedMapId = map.id;
     setState(() {
       _currentMap = map;
+      _markerMode = false;
+      _tokenPlacementMode = false;
     });
     _scheduleSave();
   }
@@ -104,6 +106,8 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     project.lastOpenedMapId = map.id;
     setState(() {
       _currentMap = map;
+      _markerMode = false;
+      _tokenPlacementMode = false;
     });
     _scheduleSave();
   }
@@ -113,7 +117,9 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     final project = _project;
     if (map == null || project == null) return;
     final marker = _storage.createMarkerData(relative.dx, relative.dy);
-    map.markers.add(marker);
+    setState(() {
+      map.markers.add(marker);
+    });
     _scheduleSave();
     _editMarker(marker);
   }
@@ -123,7 +129,9 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     final project = _project;
     if (map == null || project == null) return;
     final token = _storage.createTokenData(relative.dx, relative.dy);
-    map.tokens.add(token);
+    setState(() {
+      map.tokens.add(token);
+    });
     _scheduleSave();
     _editToken(token);
   }
@@ -148,51 +156,54 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 16,
-          right: 16,
-          top: 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: labelController,
-              decoration: const InputDecoration(labelText: 'Название'),
-            ),
-            DropdownButtonFormField<String?>(
-              value: targetMapId,
-              decoration: const InputDecoration(labelText: 'Целевая карта'),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Нет')),
-                ...project.maps.map(
-                  (m) => DropdownMenuItem(value: m.id, child: Text(m.name)),
-                ),
-              ],
-              onChanged: (value) => targetMapId = value,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Удалить'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Сохранить'),
-                ),
-              ],
-            ),
-          ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, modalSetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: labelController,
+                decoration: const InputDecoration(labelText: 'Название'),
+              ),
+              DropdownButtonFormField<String?>(
+                value: targetMapId,
+                decoration: const InputDecoration(labelText: 'Целевая карта'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Нет')),
+                  ...project.maps.map(
+                    (m) => DropdownMenuItem(value: m.id, child: Text(m.name)),
+                  ),
+                ],
+                onChanged: (value) => modalSetState(() => targetMapId = value),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Удалить'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Сохранить'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
     if (result == true) {
       marker.label = labelController.text;
       marker.targetMapId = targetMapId;
+      setState(() {});
       _scheduleSave();
     } else if (result == false) {
       map.markers.removeWhere((m) => m.id == marker.id);
@@ -210,62 +221,64 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 16,
-          right: 16,
-          top: 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: labelController,
-              decoration: const InputDecoration(labelText: 'Название'),
-            ),
-            CheckboxListTile(
-              value: visible,
-              onChanged: (val) {
-                setState(() {
-                  visible = val ?? true;
-                });
-              },
-              title: const Text('Показывать игрокам (на ТВ)'),
-            ),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    final picked = await _imageService.pickImageFromGallery();
-                    if (picked != null) {
-                      final copied = await _storage.copyImageToProject(project.id, picked);
-                      setState(() {
-                        imagePath = copied;
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.image),
-                  label: const Text('Иконка токена'),
-                ),
-                const SizedBox(width: 8),
-                if (imagePath != null) const Text('Выбрано'),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Удалить'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Сохранить'),
-                ),
-              ],
-            ),
-          ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, modalSetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: labelController,
+                decoration: const InputDecoration(labelText: 'Название'),
+              ),
+              CheckboxListTile(
+                value: visible,
+                onChanged: (val) {
+                  modalSetState(() {
+                    visible = val ?? true;
+                  });
+                },
+                title: const Text('Показывать игрокам (на ТВ)'),
+              ),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final picked = await _imageService.pickImageFromGallery();
+                      if (picked != null) {
+                        final copied = await _storage.copyImageToProject(project.id, picked);
+                        modalSetState(() {
+                          imagePath = copied;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.image),
+                    label: const Text('Иконка токена'),
+                  ),
+                  const SizedBox(width: 8),
+                  if (imagePath != null) const Text('Выбрано'),
+                ],
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Удалить'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Сохранить'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -274,6 +287,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
       token.label = labelController.text;
       token.visibleForPlayers = visible;
       token.imagePath = imagePath;
+      setState(() {});
       _scheduleSave();
     } else if (result == false) {
       _currentMap?.tokens.removeWhere((t) => t.id == token.id);
@@ -286,15 +300,30 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     final map = _currentMap;
     if (map == null) return;
     final tokens = map.tokens.where((t) => t.visibleForPlayers).toList();
-    final png = await _exportService.captureWidgetToPng(() => _SceneExportView(
-          map: map,
-          tokens: tokens,
-        ));
+    final png = await _exportService.captureWidgetToPng(
+      _SceneExportView(
+        map: map,
+        tokens: tokens,
+      ),
+      pixelRatio: 2.0,
+    );
     await _exportService.savePngToGallery(png, name: map.name);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Сцена экспортирована в галерею')),
       );
+    }
+  }
+
+  void _handleCanvasTap(Offset relative) {
+    if (_markerMode) {
+      _addMarkerAt(relative);
+      setState(() => _markerMode = false);
+      return;
+    }
+    if (_tokenPlacementMode) {
+      _addTokenAt(relative);
+      setState(() => _tokenPlacementMode = false);
     }
   }
 
@@ -316,14 +345,22 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
         title: Text(project?.name ?? 'Проект'),
         actions: [
           IconButton(
-            onPressed: () => setState(() => _markerMode = !_markerMode),
+            onPressed: () => setState(() {
+              _tokenPlacementMode = false;
+              _markerMode = !_markerMode;
+            }),
             icon: Icon(_markerMode ? Icons.push_pin : Icons.push_pin_outlined),
             tooltip: 'Добавить маркер',
           ),
           IconButton(
             onPressed: () {
-              setState(() => _markerMode = false);
-              _addTokenAt(const Offset(0.5, 0.5));
+              setState(() {
+                _markerMode = false;
+                _tokenPlacementMode = true;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Тапните по карте, чтобы поставить токен')),
+              );
             },
             icon: const Icon(Icons.person_add),
             tooltip: 'Добавить токен',
@@ -350,15 +387,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
                       ? const Center(child: Text('Добавьте карту'))
                       : MapCanvas(
                           map: map,
-                          markerMode: _markerMode,
-                          onTapForNewMarker: (pos) {
-                            if (_markerMode) {
-                              _addMarkerAt(pos);
-                              setState(() => _markerMode = false);
-                            } else {
-                              _addTokenAt(pos);
-                            }
-                          },
+                          onTap: _handleCanvasTap,
                           onMarkerTap: (id) {
                             final marker = map.markers.firstWhere((m) => m.id == id);
                             _editMarker(marker);
@@ -388,32 +417,26 @@ class _SceneExportView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, constraints.maxHeight);
-          return AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Image.file(
-                    File(map.imagePath),
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                ...tokens.map(
-                  (t) => Positioned(
-                    left: t.x * size.width,
-                    top: t.y * size.height,
-                    child: _TokenView(token: t),
-                  ),
-                ),
-              ],
+    const targetSize = Size(1920, 1080);
+    return SizedBox(
+      width: targetSize.width,
+      height: targetSize.height,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.file(
+              File(map.imagePath),
+              fit: BoxFit.cover,
             ),
-          );
-        },
+          ),
+          ...tokens.map(
+            (t) => Positioned(
+              left: t.x * targetSize.width,
+              top: t.y * targetSize.height,
+              child: _TokenView(token: t),
+            ),
+          ),
+        ],
       ),
     );
   }

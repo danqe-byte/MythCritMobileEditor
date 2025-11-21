@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../models/project.dart';
-import '../../services/image_service.dart';
 import '../../services/project_storage.dart';
 import 'map_editor_screen.dart';
 
@@ -14,7 +13,6 @@ class ProjectListScreen extends StatefulWidget {
 
 class _ProjectListScreenState extends State<ProjectListScreen> {
   final ProjectStorage _storage = ProjectStorage();
-  final ImageService _imageService = ImageService();
   late Future<List<ProjectMeta>> _projectsFuture;
 
   @override
@@ -49,8 +47,10 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
       ),
     );
     if (name != null && name.isNotEmpty) {
-      await _storage.createNewProject(name);
-      if (mounted) _refresh();
+      final project = await _storage.createNewProject(name);
+      if (mounted) {
+        _openProject(ProjectMeta.fromProject(project));
+      }
     }
   }
 
