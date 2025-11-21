@@ -11,16 +11,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Java (for Android build)
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
 
+      - name: Flutter doctor
+        run: flutter doctor -v
+
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Accept Android licenses
+        run: yes | flutter doctor --android-licenses
+
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --no-shrink --release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
