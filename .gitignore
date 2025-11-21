@@ -1,0 +1,24 @@
+# Flutter/Dart/Pub related
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
+.lock
+.idea/
+.vscode/
+
+# Generated Android files
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
+
+# iOS
+**/ios/Flutter/
+**/ios/Pods/
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# Other
+*.iml
+*.log

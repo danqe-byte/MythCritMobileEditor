@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+DEFAULT_JVM_OPTS=""
+APP_HOME=$(cd "${0%/*}" && pwd -P)
+
+# Include the Gradle wrapper script from Flutter tooling if present
+if [ -x "$APP_HOME/../flutter/bin/flutter" ]; then
+  FLUTTER_ROOT="$APP_HOME/../flutter"
+fi
+
+exec "$APP_HOME/gradlew" "$@"
